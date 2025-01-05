@@ -1,0 +1,16 @@
+[package]
+name = "colorparser-css"
+version = "0.1.0"
+edition = "2024"
+
+[package.metadata.docs.rs]
+features = ["named-colors", "serde"]
+
+[features]
+default = ["named-colors"]
+named-colors = ["phf"]
+
+[dependencies]
+regex = "1.11.1"
+serde = { version = "1.0.217", features = ["derive"], optional = true }
+phf = { version = "0.11.2", optional = true, features = ["macros"] }
