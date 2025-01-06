@@ -9,6 +9,17 @@ fn main() {
         "gradient(rgb(137, 180, 250), rgb(203, 166, 247))",
     ];
 
+    let other_test = "darken(rgb(137, 180, 250), 5%)";
+
+    println!(
+        "{}",
+        Color::from_html(other_test)
+            .unwrap()
+            .to_solid()
+            .unwrap()
+            .to_rgba()
+    );
+
     for s in test_case {
         let a = Color::from_html(s).unwrap();
 

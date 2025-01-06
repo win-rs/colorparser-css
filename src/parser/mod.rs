@@ -5,12 +5,15 @@ use crate::Solid;
 use crate::gradient::Gradient;
 use crate::gradient::GradientCoordinates;
 use crate::gradient::is_valid_direction;
+use crate::utils::darken;
+use crate::utils::lighten;
 use crate::utils::strip_string;
 
 #[cfg(feature = "named-colors")]
 mod named_colors;
 
 use named_colors::COLOR_REGEX;
+use named_colors::DARKEN_LIGHTEN_REGEX;
 #[cfg(feature = "named-colors")]
 pub use named_colors::NAMED_COLORS;
 
@@ -62,6 +65,10 @@ pub fn parse_solid(s: &str) -> Result<Solid> {
     // Hex format
     if let Some(s) = s.strip_prefix('#') {
         return parse_hex(s);
+    }
+
+    if s.starts_with("darken(") || s.starts_with("lighten(") {
+        return parse_darken_or_lighten(&s);
     }
 
     if let (Some(i), Some(s)) = (s.find('('), s.strip_suffix(')')) {
@@ -119,7 +126,7 @@ pub fn parse_solid(s: &str) -> Result<Solid> {
 
                 if let (Some(h), Some((s, s_fmt)), Some((l, l_fmt)), Some((a, _))) = (h, s, l, a) {
                     if s_fmt == l_fmt {
-                        return Ok(Solid::from_hsla(h, s, l, a));
+                        return Ok(Solid::from_normalized_hsla(h, s, l, a));
                     }
                 }
 
@@ -184,6 +191,35 @@ pub fn parse(s: &str) -> Result<Color> {
         parse_gradient(s).map(|res| Color(ColorValue::Gradient(res)))
     } else {
         parse_solid(s).map(|res| Color(ColorValue::Solid(res)))
+    }
+}
+
+fn parse_darken_or_lighten(s: &str) -> Result<Solid> {
+    let is_darken = s.starts_with("darken(");
+    if let Some(caps) = DARKEN_LIGHTEN_REGEX.captures(s) {
+        if caps.len() != 4 {
+            return match is_darken {
+                true => Err(Error::new(ErrorKind::InvalidDarken, s)),
+                false => Err(Error::new(ErrorKind::InvalidLighten, s)),
+            };
+        }
+        let dark_or_lighten = &caps[1];
+        let color_str = &caps[2];
+        let percentage = &caps[3].parse::<f32>().unwrap_or(10.0);
+
+        let color = parse_solid(color_str)?;
+        let color_res = match dark_or_lighten {
+            "darken" => darken(color.to_hsla(), *percentage),
+            "lighten" => lighten(color.to_hsla(), *percentage),
+            _ => color,
+        };
+
+        return Ok(color_res);
+    }
+
+    match is_darken {
+        true => Err(Error::new(ErrorKind::InvalidDarken, s)),
+        false => Err(Error::new(ErrorKind::InvalidLighten, s)),
     }
 }
 

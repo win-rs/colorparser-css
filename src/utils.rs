@@ -152,11 +152,11 @@ pub fn strip_string(input: String, prefixes: &[&str], suffix: char) -> String {
 pub fn darken(color: Hsla, percentage: f32) -> Solid {
     let mut hsla = color;
     hsla.l -= percentage;
-    Solid::from_hsla(hsla.h, hsla.s / 100.0, hsla.l / 100.0, hsla.a)
+    Solid::from_hsla(hsla.h, hsla.s, hsla.l, hsla.a)
 }
 
 pub fn lighten(color: Hsla, percentage: f32) -> Solid {
     let mut hsla = color;
     hsla.l += percentage;
-    Solid::from_hsla(hsla.h, hsla.s / 100.0, hsla.l / 100.0, hsla.a)
+    Solid::from_hsla(hsla.h, hsla.s, hsla.l, hsla.a)
 }

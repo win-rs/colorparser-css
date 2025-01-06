@@ -13,6 +13,10 @@ pub enum ErrorKind {
     InvalidGradient,
     /// error when the provided gradient coordinates is invalid.
     InvalidGradientCoordinates,
+    /// Error when the provided darken format is invalid.
+    InvalidDarken,
+    /// Error when the provided lighten format is invalid.
+    InvalidLighten,
     // Error when unknown.
     InvalidUnknown,
 }
@@ -28,6 +32,8 @@ impl core::fmt::Display for ErrorKind {
             Self::InvalidHsl => write!(f, "invalid hsl format"),
             Self::InvalidGradient => write!(f, "invalid gradient format"),
             Self::InvalidGradientCoordinates => write!(f, "invalid gradient coordinates format"),
+            Self::InvalidDarken => write!(f, "invalid darken format"),
+            Self::InvalidLighten => write!(f, "invalid lighten format"),
             Self::InvalidFunction => write!(f, "invalid color function"),
             Self::InvalidUnknown => write!(f, "invalid unknown format"),
         }

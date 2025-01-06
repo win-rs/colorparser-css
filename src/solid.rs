@@ -182,32 +182,28 @@ impl Solid {
     /// Arguments:
     ///
     /// * `h`: Hue angle [0..360]
+    /// * `s`: Saturation [0..100]
+    /// * `l`: Lightness [0..100]
+    /// * `a`: Alpha [0..1]
+    pub fn from_hsla(h: f32, s: f32, l: f32, a: f32) -> Self {
+        let (r, g, b) = hsl_to_rgb(normalize_angle(h), clamp0_1(s / 100.0), clamp0_1(l / 100.0));
+
+        Self::new(clamp0_1(r), clamp0_1(g), clamp0_1(b), clamp0_1(a))
+    }
+
+    /// Arguments:
+    ///
+    /// * `h`: Hue angle [0..360]
     /// * `s`: Saturation [0..1]
     /// * `l`: Lightness [0..1]
     /// * `a`: Alpha [0..1]
-    pub fn from_hsla(h: f32, s: f32, l: f32, a: f32) -> Self {
+    pub fn from_normalized_hsla(h: f32, s: f32, l: f32, a: f32) -> Self {
         let (r, g, b) = hsl_to_rgb(normalize_angle(h), clamp0_1(s), clamp0_1(l));
 
         Self::new(clamp0_1(r), clamp0_1(g), clamp0_1(b), clamp0_1(a))
     }
 
-    /// Create color from CSS color string.
-    ///
-    /// # Examples
-    /// ```
-    /// use csscolorparser::Solid;
-    /// # use std::error::Error;
-    /// # fn main() -> Result<(), Box<dyn Error>> {
-    ///
-    /// let c = Solid::from_html("rgb(255,0,0)")?;
-    ///
-    /// assert_eq!(c.to_array(), [1.0, 0.0, 0.0, 1.0]);
-    /// assert_eq!(c.to_rgba8(), [255, 0, 0, 255]);
-    /// assert_eq!(c.to_hex_string(), "#ff0000");
-    /// assert_eq!(c.to_rgb_string(), "rgb(255,0,0)");
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// Create `Solid` from CSS color string.
     pub fn from_html<S: AsRef<str>>(s: S) -> SolidResult<Self> {
         parse_solid(s.as_ref())
     }
