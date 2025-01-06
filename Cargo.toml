@@ -1,7 +1,15 @@
 [package]
 name = "colorparser-css"
+authors = ["0xJWLabs <0xjwlabs@gmail.com>"]
 version = "0.0.1"
 edition = "2024"
+description = "CSS color parser library"
+readme = "README.md"
+repository = "https://github.com/win-rs/colorparser-css"
+documentation = "https://docs.rs/colorparser-css/"
+license = "MIT OR Apache-2.0"
+keywords = ["color", "colour", "css", "parser"]
+categories = ["graphics", "parser-implementations"]
 
 [package.metadata.docs.rs]
 features = ["named-colors", "serde"]
