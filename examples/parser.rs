@@ -6,7 +6,8 @@ fn main() {
         "#89B4FA",
         "rgba(137, 180, 250, 1)",
         "hsla(217.16815, 91.869934%, 75.882355%, 1)",
-        "gradient(rgb(137, 180, 250), rgb(203, 166, 247))",
+        "accent",
+        "accent_inactive",
     ];
 
     let other_test = "darken(rgb(137, 180, 250), 5%)";

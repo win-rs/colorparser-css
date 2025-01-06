@@ -204,7 +204,7 @@ impl Solid {
     }
 
     /// Create `Solid` from CSS color string.
-    pub fn from_html<S: AsRef<str>>(s: S) -> SolidResult<Self> {
+    pub fn from_html<S: AsRef<str>>(s: S) -> SolidResult<Solid> {
         parse_solid(s.as_ref())
     }
 

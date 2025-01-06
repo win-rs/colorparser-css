@@ -1,3 +1,11 @@
+#![allow(unused_imports)]
+use crate::Error;
+use crate::ErrorKind;
+use crate::Result;
+use windows_sys::Win32::Foundation::BOOL;
+use windows_sys::Win32::Foundation::FALSE;
+use windows_sys::Win32::Graphics::Dwm::DwmGetColorizationColor;
+
 use crate::{Hsla, Solid};
 
 fn hue_to_rgb(n1: f32, n2: f32, h: f32) -> f32 {
@@ -159,4 +167,36 @@ pub fn lighten(color: Hsla, percentage: f32) -> Solid {
     let mut hsla = color;
     hsla.l += percentage;
     Solid::from_hsla(hsla.h, hsla.s, hsla.l, hsla.a)
+}
+
+pub fn get_accent(active: bool) -> Result<Solid> {
+    #[cfg(windows)]
+    {
+        let mut pcr_colorization: u32 = 0;
+        let mut pf_opaqueblend: BOOL = FALSE;
+        unsafe { DwmGetColorizationColor(&mut pcr_colorization, &mut pf_opaqueblend) };
+
+        let r = ((pcr_colorization & 0x00FF0000) >> 16) as f32 / 255.0;
+        let g = ((pcr_colorization & 0x0000FF00) >> 8) as f32 / 255.0;
+        let b = (pcr_colorization & 0x000000FF) as f32 / 255.0;
+        let avg = (r + g + b) / 3.0;
+
+        match active {
+            true => Ok(Solid::from([r, g, b, 1.0])),
+            false => Ok(Solid::from([
+                avg / 1.5 + r / 10.0,
+                avg / 1.5 + g / 10.0,
+                avg / 1.5 + b / 10.0,
+                1.0,
+            ])),
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        Err(Error::new(
+            ErrorKind::InvalidFunction,
+            "accent is only available on windows platform",
+        ))
+    }
 }

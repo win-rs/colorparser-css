@@ -1,11 +1,12 @@
 [package]
 name = "colorparser-css"
 authors = ["0xJWLabs <0xjwlabs@gmail.com>"]
-version = "0.0.1"
+version = "0.0.2"
 edition = "2024"
 description = "CSS color parser library"
 readme = "README.md"
 repository = "https://github.com/win-rs/colorparser-css"
+homepage = "https:://github.com/win-rs/colorparser-css"
 documentation = "https://docs.rs/colorparser-css/"
 license = "MIT OR Apache-2.0"
 keywords = ["color", "colour", "css", "parser"]
@@ -22,3 +23,9 @@ named-colors = ["phf"]
 regex = "1.11.1"
 serde = { version = "1.0.217", features = ["derive"], optional = true }
 phf = { version = "0.11.2", optional = true, features = ["macros"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.59.0", features = [
+  "Win32_Graphics_Dwm",
+  "Win32_Foundation",
+] }

@@ -6,6 +6,7 @@ use crate::gradient::Gradient;
 use crate::gradient::GradientCoordinates;
 use crate::gradient::is_valid_direction;
 use crate::utils::darken;
+use crate::utils::get_accent;
 use crate::utils::lighten;
 use crate::utils::strip_string;
 
@@ -54,6 +55,14 @@ pub fn parse_solid(s: &str) -> Result<Solid> {
 
     if s == "transparent" {
         return Ok(Solid::new(0.0, 0.0, 0.0, 0.0));
+    }
+
+    if s == "accent" {
+        return get_accent(true);
+    }
+
+    if s == "accent_inactive" {
+        return get_accent(false);
     }
 
     // Named colors
@@ -208,6 +217,7 @@ fn parse_darken_or_lighten(s: &str) -> Result<Solid> {
         let percentage = &caps[3].parse::<f32>().unwrap_or(10.0);
 
         let color = parse_solid(color_str)?;
+
         let color_res = match dark_or_lighten {
             "darken" => darken(color.to_hsla(), *percentage),
             "lighten" => lighten(color.to_hsla(), *percentage),
