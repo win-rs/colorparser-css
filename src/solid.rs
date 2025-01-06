@@ -1,47 +1,26 @@
 use std::convert::TryFrom;
 use std::fmt;
+use std::ops::Mul;
 use std::str::FromStr;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Visitor};
 
+use crate::ColorspaceImpl;
 use crate::Error;
+use crate::Hsla;
+use crate::NormalizedHsla;
+use crate::NormalizedRgba;
 use crate::Result as SolidResult;
-use crate::parser::parse_solid;
-
+use crate::Rgba;
+use crate::Rgba16;
 #[cfg(feature = "named-colors")]
-pub use crate::parser::NAMED_COLORS;
-
+use crate::parser::NAMED_COLORS;
+use crate::parser::parse_solid;
 use crate::utils::{clamp0_1, hsl_to_rgb, normalize_angle, rgb_to_hsl};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
-/// The color
-pub struct Solid {
-    /// Red
-    pub r: f32,
-    /// Green
-    pub g: f32,
-    /// Blue
-    pub b: f32,
-    /// Alpha
-    pub a: f32,
-}
-
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct Rgba<T> {
-    pub r: T,
-    pub g: T,
-    pub b: T,
-    pub a: f32,
-}
-
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct Hsla<T> {
-    pub h: T,
-    pub s: T,
-    pub l: T,
-    pub a: f32,
-}
+pub struct Solid(f32, f32, f32, f32);
 
 impl Solid {
     /// Arguments:
@@ -51,47 +30,47 @@ impl Solid {
     /// * `b`: Blue value [0..1]
     /// * `a`: Alpha value [0..1]
     pub const fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Self { r, g, b, a }
+        Self(r, g, b, a)
     }
 
     pub fn to_array(&self) -> [f32; 4] {
-        [self.r, self.g, self.b, self.a]
+        [self.0, self.1, self.2, self.3]
     }
 
-    pub fn to_rgba(&self) -> Rgba<u8> {
+    pub fn to_rgba(&self) -> Rgba {
         Rgba {
-            r: (self.r * 255.0 + 0.5) as u8,
-            g: (self.g * 255.0 + 0.5) as u8,
-            b: (self.b * 255.0 + 0.5) as u8,
-            a: self.a,
+            r: self.0.mul_add(255.0, 0.5) as u8,
+            g: self.1.mul_add(255.0, 0.5) as u8,
+            b: self.2.mul_add(255.0, 0.5) as u8,
+            a: self.3,
         }
     }
 
-    pub fn to_rgba_f(&self) -> Rgba<f32> {
-        Rgba {
-            r: self.r,
-            g: self.g,
-            b: self.b,
-            a: self.a,
+    pub fn to_normalized_rgba(&self) -> NormalizedRgba {
+        NormalizedRgba {
+            r: self.0,
+            g: self.1,
+            b: self.2,
+            a: self.3,
         }
     }
 
-    pub fn to_rgba16(&self) -> Rgba<u16> {
-        Rgba {
-            r: (self.r * 65535.0 + 0.5) as u16,
-            g: (self.g * 65535.0 + 0.5) as u16,
-            b: (self.b * 65535.0 + 0.5) as u16,
-            a: self.a,
+    pub fn to_rgba16(&self) -> Rgba16 {
+        Rgba16 {
+            r: self.0.mul_add(65535.0, 0.5) as u16,
+            g: self.1.mul_add(65535.0, 0.5) as u16,
+            b: self.2.mul_add(65535.0, 0.5) as u16,
+            a: self.3,
         }
     }
 
     pub fn clamp(&self) -> Self {
-        Self {
-            r: self.r.clamp(0.0, 1.0),
-            g: self.g.clamp(0.0, 1.0),
-            b: self.b.clamp(0.0, 1.0),
-            a: self.a.clamp(0.0, 1.0),
-        }
+        Self(
+            self.0.clamp(0.0, 1.0),
+            self.1.clamp(0.0, 1.0),
+            self.2.clamp(0.0, 1.0),
+            self.3.clamp(0.0, 1.0),
+        )
     }
 
     /// Arguments:
@@ -101,12 +80,27 @@ impl Solid {
     /// * `b`: Blue value [0..255]
     /// * `a`: Alpha value [0..255]
     pub fn from_rgba8(r: u8, g: u8, b: u8, a: u8) -> Self {
-        Self {
-            r: r as f32 / 255.0,
-            g: g as f32 / 255.0,
-            b: b as f32 / 255.0,
-            a: a as f32 / 255.0,
-        }
+        Self::new(
+            r as f32 / 255.0,
+            g as f32 / 255.0,
+            b as f32 / 255.0,
+            a as f32 / 255.0,
+        )
+    }
+
+    /// Arguments:
+    ///
+    /// * `r`: Red value [0..65535]
+    /// * `g`: Green value [0..65535]
+    /// * `b`: Blue value [0..65535]
+    /// * `a`: Alpha value [0..65535]
+    pub fn from_rgba16(r: u16, g: u16, b: u16, a: u16) -> Self {
+        Self::new(
+            r as f32 / 65535.0,
+            g as f32 / 65535.0,
+            b as f32 / 65535.0,
+            a as f32 / 65535.0,
+        )
     }
 
     /// Arguments:
@@ -116,12 +110,7 @@ impl Solid {
     /// * `b`: Blue value [0..255]
     /// * `a`: Alpha value [0..1]
     pub fn from_rgba(r: u8, g: u8, b: u8, a: f32) -> Self {
-        Self {
-            r: r as f32 / 255.0,
-            g: g as f32 / 255.0,
-            b: b as f32 / 255.0,
-            a,
-        }
+        Self::new(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, a)
     }
 
     /// Arguments:
@@ -130,7 +119,17 @@ impl Solid {
     /// * `g`: Green value [0..1]
     /// * `b`: Blue value [0..1]
     /// * `a`: Alpha value [0..1]
-    pub fn from_linear_rgba_f(r: f32, g: f32, b: f32, a: f32) -> Self {
+    pub fn from_normalized_rgba(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self::new(r, g, b, a)
+    }
+
+    /// Arguments:
+    ///
+    /// * `r`: Red value [0..1]
+    /// * `g`: Green value [0..1]
+    /// * `b`: Blue value [0..1]
+    /// * `a`: Alpha value [0..1]
+    pub fn from_normalized_linear_rgba(r: f32, g: f32, b: f32, a: f32) -> Self {
         fn from_linear(x: f32) -> f32 {
             if x >= 0.0031308 {
                 return 1.055 * x.powf(1.0 / 2.4) - 0.055;
@@ -147,18 +146,7 @@ impl Solid {
     /// * `b`: Blue value [0..255]
     /// * `a`: Alpha value [0..1]
     pub fn from_linear_rgba(r: u8, g: u8, b: u8, a: f32) -> Self {
-        fn from_linear(x: f32) -> f32 {
-            if x >= 0.0031308 {
-                return 1.055 * x.powf(1.0 / 2.4) - 0.055;
-            }
-            12.92 * x
-        }
-        Self::new(
-            from_linear(r as f32 / 255.0),
-            from_linear(g as f32 / 255.0),
-            from_linear(b as f32 / 255.0),
-            a,
-        )
+        Self::from_normalized_linear_rgba(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, a)
     }
 
     /// Arguments:
@@ -168,7 +156,27 @@ impl Solid {
     /// * `b`: Blue value [0..255]
     /// * `a`: Alpha value [0..255]
     pub fn from_linear_rgba8(r: u8, g: u8, b: u8, a: u8) -> Self {
-        Self::from_linear_rgba(r, g, b, a as f32 / 255.0)
+        Self::from_normalized_linear_rgba(
+            r as f32 / 255.0,
+            g as f32 / 255.0,
+            b as f32 / 255.0,
+            a as f32 / 255.0,
+        )
+    }
+
+    /// Arguments:
+    ///
+    /// * `r`: Red value [0..65535]
+    /// * `g`: Green value [0..65535]
+    /// * `b`: Blue value [0..65535]
+    /// * `a`: Alpha value [0..65535]
+    pub fn from_linear_rgba16(r: u16, g: u16, b: u16, a: u16) -> Self {
+        Self::from_normalized_linear_rgba(
+            r as f32 / 65535.0,
+            g as f32 / 65535.0,
+            b as f32 / 65535.0,
+            a as f32 / 65535.0,
+        )
     }
 
     /// Arguments:
@@ -179,6 +187,7 @@ impl Solid {
     /// * `a`: Alpha [0..1]
     pub fn from_hsla(h: f32, s: f32, l: f32, a: f32) -> Self {
         let (r, g, b) = hsl_to_rgb(normalize_angle(h), clamp0_1(s), clamp0_1(l));
+
         Self::new(clamp0_1(r), clamp0_1(g), clamp0_1(b), clamp0_1(a))
     }
 
@@ -220,14 +229,13 @@ impl Solid {
     /// * `s`: Saturation [0..100]
     /// * `l`: Lightness [0..100]
     /// * `a`: Alpha [0..1]
-    pub fn to_hsla(&self) -> Hsla<u8> {
-        let (h, s, l) = rgb_to_hsl(self.r, self.g, self.b);
-
+    pub fn to_hsla(&self) -> Hsla {
+        let (h, s, l) = rgb_to_hsl(self.0, self.1, self.2);
         Hsla {
-            h: h as u8,
-            s: (s * 100.0).round() as u8,
-            l: (l * 100.0).round() as u8,
-            a: self.a,
+            h,
+            s: s.mul(100.0),
+            l: l.mul(100.0),
+            a: self.3,
         }
     }
 
@@ -237,47 +245,46 @@ impl Solid {
     /// * `s`: Saturation [0..1]
     /// * `l`: Lightness [0..1]
     /// * `a`: Alpha [0..1]
-    pub fn to_hsla_f(&self) -> Hsla<f32> {
-        let (h, s, l) = rgb_to_hsl(self.r, self.g, self.b);
-
-        Hsla { h, s, l, a: self.a }
+    pub fn to_normalized_hsla(&self) -> NormalizedHsla {
+        let (h, s, l) = rgb_to_hsl(self.0, self.1, self.2);
+        NormalizedHsla { h, s, l, a: self.3 }
     }
 
     /// Returns: `[r, g, b, a]`
     ///
     /// * Red, green, blue and alpha in the range [0..1]
-    pub fn to_linear_rgba_f(&self) -> Rgba<f32> {
+    pub fn to_normalized_linear_rgba(&self) -> NormalizedRgba {
         fn to_linear(x: f32) -> f32 {
             if x >= 0.04045 {
                 return ((x + 0.055) / 1.055).powf(2.4);
             }
             x / 12.92
         }
-        Rgba {
-            r: to_linear(self.r),
-            g: to_linear(self.g),
-            b: to_linear(self.b),
-            a: self.a,
+        NormalizedRgba {
+            r: to_linear(self.0),
+            g: to_linear(self.1),
+            b: to_linear(self.2),
+            a: self.3,
         }
     }
 
     /// Returns: `[r, g, b, a]`
     /// * Red, green, blue in the range [0..255]
     /// * Alpha in the range [0..1]
-    pub fn to_linear_rgba(&self) -> Rgba<u8> {
-        let f_rgba = self.to_linear_rgba_f();
+    pub fn to_linear_rgba(&self) -> Rgba {
+        let n_rgba = self.to_normalized_linear_rgba();
         Rgba {
-            r: (f_rgba.r * 255.0).round() as u8,
-            g: (f_rgba.g * 255.0).round() as u8,
-            b: (f_rgba.b * 255.0).round() as u8,
-            a: f_rgba.a,
+            r: n_rgba.r.mul(255.0).round() as u8,
+            g: n_rgba.g.mul(255.0).round() as u8,
+            b: n_rgba.b.mul(255.0).round() as u8,
+            a: n_rgba.a,
         }
     }
 
     /// Get the RGB hexadecimal color string.
     pub fn to_hex_string(&self) -> String {
         let rgba = self.to_rgba();
-        let alpha = (rgba.a * 255.0).round() as u8;
+        let alpha = rgba.a.mul_add(255.0, 0.5).round() as u8;
 
         if alpha < 255 {
             return format!("#{:02x}{:02x}{:02x}{:02x}", rgba.r, rgba.g, rgba.b, alpha);
@@ -290,8 +297,8 @@ impl Solid {
     pub fn to_rgb_string(&self) -> String {
         let rgba = self.to_rgba();
 
-        if self.a < 1.0 {
-            return format!("rgba({},{},{},{})", rgba.r, rgba.g, rgba.b, self.a);
+        if self.3 < 1.0 {
+            return format!("rgba({},{},{},{})", rgba.r, rgba.g, rgba.b, self.3);
         }
 
         format!("rgb({},{},{})", rgba.r, rgba.g, rgba.b)
@@ -299,81 +306,46 @@ impl Solid {
 
     /// Blend this color with the other one, in the RGB color-space. `t` in the range [0..1].
     pub fn interpolate_rgb(&self, other: &Solid, t: f32) -> Self {
-        Self {
-            r: self.r + t * (other.r - self.r),
-            g: self.g + t * (other.g - self.g),
-            b: self.b + t * (other.b - self.b),
-            a: self.a + t * (other.a - self.a),
-        }
+        Self::new(
+            self.0 + t * (other.0 - self.0),
+            self.1 + t * (other.1 - self.1),
+            self.2 + t * (other.2 - self.2),
+            self.3 + t * (other.3 - self.3),
+        )
     }
 
     /// Blend this color with the other one, in the linear RGB color-space. `t` in the range [0..1].
     pub fn interpolate_linear_rgb(&self, other: &Solid, t: f32) -> Self {
-        let rgba_1 = self.to_linear_rgba_f();
-        let rgba_2 = other.to_linear_rgba_f();
-        Self::from_linear_rgba_f(
+        let rgba_1 = self.to_normalized_linear_rgba();
+        let rgba_2 = other.to_normalized_linear_rgba();
+        Self::from_normalized_linear_rgba(
             rgba_1.r + t * (rgba_2.r - rgba_1.r),
             rgba_1.g + t * (rgba_2.g - rgba_1.g),
             rgba_1.b + t * (rgba_2.b - rgba_1.b),
             rgba_1.a + t * (rgba_2.a - rgba_1.a),
         )
     }
+
+    pub fn darken(&self, percentage: f32) -> Self {
+        let rgba = self.to_normalized_rgba().darken(percentage);
+        Self::from(rgba)
+    }
+
+    pub fn lighten(&self, percentage: f32) -> Self {
+        let rgba = self.to_normalized_rgba().lighten(percentage);
+        Self::from(rgba)
+    }
 }
 
 impl Default for Solid {
     fn default() -> Self {
-        Self {
-            r: 0.0,
-            g: 0.0,
-            b: 0.0,
-            a: 1.0,
-        }
+        Self::new(0.0, 0.0, 0.0, 1.0)
     }
 }
 
 impl fmt::Display for Solid {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Solid({}, {}, {}, {})", self.r, self.g, self.b, self.a)
-    }
-}
-
-impl fmt::Display for Rgba<u8> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Rgba({}, {}, {}, {:.2})", // Format floating-point values to 2 decimal places
-            self.r, self.g, self.b, self.a
-        )
-    }
-}
-
-impl fmt::Display for Rgba<f32> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Rgba({:.2}, {:.2}, {:.2}, {:.2})", // Format floating-point values to 2 decimal places
-            self.r, self.g, self.b, self.a
-        )
-    }
-}
-
-impl fmt::Display for Hsla<u8> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Hsla({}, {}, {}, {:.2})", // Format floating-point values to 2 decimal places
-            self.h, self.s, self.l, self.a
-        )
-    }
-}
-
-impl fmt::Display for Hsla<f32> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Hsla({:.2}, {:.2}, {:.2}, {:.2})", // Format floating-point values to 2 decimal places
-            self.h, self.s, self.l, self.a
-        )
+        write!(f, "Solid({}, {}, {}, {})", self.0, self.1, self.2, self.3)
     }
 }
 
@@ -393,47 +365,37 @@ impl TryFrom<&str> for Solid {
 
 impl From<(f32, f32, f32, f32)> for Solid {
     fn from((r, g, b, a): (f32, f32, f32, f32)) -> Self {
-        Self { r, g, b, a }
+        Self::new(r, g, b, a)
     }
 }
 
 impl From<(f32, f32, f32)> for Solid {
     fn from((r, g, b): (f32, f32, f32)) -> Self {
-        Self { r, g, b, a: 1.0 }
+        Self::new(r, g, b, 1.0)
     }
 }
 
 impl From<[f32; 4]> for Solid {
     fn from([r, g, b, a]: [f32; 4]) -> Self {
-        Self { r, g, b, a }
+        Self::new(r, g, b, a)
     }
 }
 
 impl From<[f32; 3]> for Solid {
     fn from([r, g, b]: [f32; 3]) -> Self {
-        Self { r, g, b, a: 1.0 }
+        Self::new(r, g, b, 1.0)
     }
 }
 
 impl From<[f64; 4]> for Solid {
     fn from([r, g, b, a]: [f64; 4]) -> Self {
-        Self {
-            r: r as f32,
-            g: g as f32,
-            b: b as f32,
-            a: a as f32,
-        }
+        Self::new(r as f32, g as f32, b as f32, a as f32)
     }
 }
 
 impl From<[f64; 3]> for Solid {
     fn from([r, g, b]: [f64; 3]) -> Self {
-        Self {
-            r: r as f32,
-            g: g as f32,
-            b: b as f32,
-            a: 1.0,
-        }
+        Self::new(r as f32, g as f32, b as f32, 1.0)
     }
 }
 
@@ -449,6 +411,12 @@ impl From<(u8, u8, u8)> for Solid {
     }
 }
 
+impl From<(u8, u8, u8, f32)> for Solid {
+    fn from((r, g, b, a): (u8, u8, u8, f32)) -> Self {
+        Self::from_rgba(r, g, b, a)
+    }
+}
+
 impl From<[u8; 4]> for Solid {
     fn from([r, g, b, a]: [u8; 4]) -> Self {
         Self::from_rgba8(r, g, b, a)
@@ -461,9 +429,51 @@ impl From<[u8; 3]> for Solid {
     }
 }
 
-impl From<(u8, u8, u8, f32)> for Solid {
-    fn from((r, g, b, a): (u8, u8, u8, f32)) -> Self {
-        Self::from_rgba(r, g, b, a)
+impl From<(u16, u16, u16, u16)> for Solid {
+    fn from((r, g, b, a): (u16, u16, u16, u16)) -> Self {
+        Self::from_rgba16(r, g, b, a)
+    }
+}
+
+impl From<(u16, u16, u16)> for Solid {
+    fn from((r, g, b): (u16, u16, u16)) -> Self {
+        Self::from_rgba16(r, g, b, 65535)
+    }
+}
+
+impl From<(u16, u16, u16, f32)> for Solid {
+    fn from((r, g, b, a): (u16, u16, u16, f32)) -> Self {
+        Self::from_rgba16(r, g, b, (a * 65535.0 + 0.5).round() as u16)
+    }
+}
+
+impl From<[u16; 4]> for Solid {
+    fn from([r, g, b, a]: [u16; 4]) -> Self {
+        Self::from_rgba16(r, g, b, a)
+    }
+}
+
+impl From<[u16; 3]> for Solid {
+    fn from([r, g, b]: [u16; 3]) -> Self {
+        Self::from_rgba16(r, g, b, 65535)
+    }
+}
+
+impl From<Rgba> for Solid {
+    fn from(rgba: Rgba) -> Self {
+        Self::from_rgba(rgba.r, rgba.g, rgba.b, rgba.a)
+    }
+}
+
+impl From<Rgba16> for Solid {
+    fn from(rgba: Rgba16) -> Self {
+        Self::from_rgba16(rgba.r, rgba.g, rgba.b, (rgba.a * 65535.0).round() as u16)
+    }
+}
+
+impl From<NormalizedRgba> for Solid {
+    fn from(rgba: NormalizedRgba) -> Self {
+        Self::from_normalized_rgba(rgba.r, rgba.g, rgba.b, rgba.a)
     }
 }
 

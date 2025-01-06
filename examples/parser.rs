@@ -1,19 +1,25 @@
-use colorparser_css::parse;
+use colorparser_css::{Color, ColorspaceImpl};
 
 fn main() {
     let test_case = [
         "rgb(137, 180, 250)",
         "#89B4FA",
-        "hsl(217, 91.9%, 75.9%)",
-        "gradient(rgb(137, 180, 250), #89b4fa, to right)",
+        "rgba(137, 180, 250, 1)",
+        "hsla(217.16815, 91.869934%, 75.882355%, 1)",
+        "gradient(rgb(137, 180, 250), rgb(203, 166, 247))",
     ];
 
     for s in test_case {
-        let a = parse(s).unwrap();
-        println!("{a}");
+        let a = Color::from_html(s).unwrap();
 
         if let Ok(solid) = a.to_solid() {
-            println!("{solid}");
+            let rgba = solid.to_rgba();
+            let darken_rgba = rgba.darken(5.0);
+            let darken_solid = solid.darken(5.0).to_rgba();
+
+            println!("RGBA: {rgba}");
+            println!("Darken RGBA: {darken_rgba}");
+            println!("Darken Solid RGBA: {darken_solid}");
         } else if let Ok(gradient) = a.to_gradient() {
             println!("{gradient}");
         }

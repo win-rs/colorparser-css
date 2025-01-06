@@ -19,7 +19,7 @@ impl fmt::Display for Gradient {
             .join(", ");
         write!(
             f,
-            "Gradient {{ start: ({:.2}, {:.2}), end: ({:.2}, {:.2}), colors: [{}] }}",
+            "Gradient {{ start: ({}, {}), end: ({}, {}), colors: [{}] }}",
             self.direction.start[0],
             self.direction.start[1],
             self.direction.end[0],

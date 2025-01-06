@@ -90,12 +90,12 @@ pub fn parse_solid(s: &str) -> Result<Solid> {
                     (r, g, b, a)
                 {
                     if r_fmt == g_fmt && g_fmt == b_fmt {
-                        return Ok(Solid {
-                            r: r.clamp(0.0, 1.0),
-                            g: g.clamp(0.0, 1.0),
-                            b: b.clamp(0.0, 1.0),
-                            a: a.clamp(0.0, 1.0),
-                        });
+                        return Ok(Solid::new(
+                            r.clamp(0.0, 1.0),
+                            g.clamp(0.0, 1.0),
+                            b.clamp(0.0, 1.0),
+                            a.clamp(0.0, 1.0),
+                        ));
                     }
                 }
 

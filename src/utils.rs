@@ -1,3 +1,5 @@
+use crate::{Hsla, Solid};
+
 fn hue_to_rgb(n1: f32, n2: f32, h: f32) -> f32 {
     let h = modulo(h, 6.0);
 
@@ -36,6 +38,47 @@ pub fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (f32, f32, f32) {
     let g = hue_to_rgb(n1, n2, h);
     let b = hue_to_rgb(n1, n2, h - 2.0);
     (r, g, b)
+}
+
+fn _get_min(rgb: &[f32]) -> f32 {
+    rgb.iter().fold(f32::MAX, |a, &b| a.min(b))
+}
+
+fn _get_max(rgb: &[f32]) -> f32 {
+    rgb.iter().fold(f32::MIN, |a, &b| a.max(b))
+}
+
+pub fn _rgb_to_hsl_other(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
+    let rgb_arr: Vec<f32> = [r, g, b].iter().map(|p| p / 255.0).collect();
+    let max = _get_max(&rgb_arr);
+    let min = _get_min(&rgb_arr);
+    let luminace = (max + min) / 2.0;
+
+    if max.eq(&min) {
+        return (0.0, 0.0, luminace * 100.0);
+    }
+
+    let max_min_delta = max - min;
+    let saturation = if luminace > 0.5 {
+        max_min_delta / (2.0 - max - min)
+    } else {
+        max_min_delta / (max + min)
+    };
+
+    let red = rgb_arr[0];
+    let green = rgb_arr[1];
+    let blue = rgb_arr[2];
+
+    let hue = if red.eq(&max) {
+        let x = if g < b { 6.0 } else { 0.0 };
+        (green - blue) / max_min_delta + x
+    } else if green.eq(&max) {
+        (blue - red) / max_min_delta + 2.0
+    } else {
+        (red - green) / max_min_delta + 4.0
+    };
+
+    (hue * 60.0, saturation, luminace)
 }
 
 #[allow(clippy::float_cmp)]
@@ -104,4 +147,16 @@ pub fn strip_string(input: String, prefixes: &[&str], suffix: char) -> String {
 
     // Remove suffix (if it exists)
     result.strip_suffix(suffix).unwrap_or(&result).to_string()
+}
+
+pub fn darken(color: Hsla, percentage: f32) -> Solid {
+    let mut hsla = color;
+    hsla.l -= percentage;
+    Solid::from_hsla(hsla.h, hsla.s / 100.0, hsla.l / 100.0, hsla.a)
+}
+
+pub fn lighten(color: Hsla, percentage: f32) -> Solid {
+    let mut hsla = color;
+    hsla.l += percentage;
+    Solid::from_hsla(hsla.h, hsla.s / 100.0, hsla.l / 100.0, hsla.a)
 }

@@ -100,6 +100,7 @@
 //! * `serde`: Enables serializing (into HEX string) and deserializing (from any supported string color format) using [`serde`](https://serde.rs/) framework.
 
 mod color;
+mod colorspace;
 mod error;
 mod gradient;
 mod parser;
@@ -108,13 +109,17 @@ mod utils;
 
 pub use color::Color;
 pub use color::ColorValue;
+pub use colorspace::ColorspaceImpl;
+pub use colorspace::Hsla;
+pub use colorspace::NormalizedHsla;
+pub use colorspace::NormalizedRgba;
+pub use colorspace::Rgba;
+pub use colorspace::Rgba16;
 pub use error::Error;
 pub use error::ErrorKind;
 pub use error::Result;
 pub use gradient::Gradient;
 pub use parser::parse;
-pub use parser::parse_gradient;
-pub use parser::parse_solid;
 pub use solid::Solid;
 
 #[cfg(feature = "named-colors")]
