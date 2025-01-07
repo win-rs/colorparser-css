@@ -119,6 +119,7 @@ pub use error::Error;
 pub use error::ErrorKind;
 pub use error::Result;
 pub use gradient::Gradient;
+pub use gradient::GradientCoordinates;
 pub use parser::parse;
 pub use solid::Solid;
 
