@@ -10,13 +10,13 @@ use crate::utils::get_accent;
 use crate::utils::lighten;
 use crate::utils::strip_string;
 
-#[cfg(feature = "named-colors")]
 mod named_colors;
-
 use named_colors::COLOR_REGEX;
 use named_colors::DARKEN_LIGHTEN_REGEX;
 #[cfg(feature = "named-colors")]
 pub use named_colors::NAMED_COLORS;
+#[cfg(feature = "hash-colors")]
+pub use named_colors::NAMED_COLORS_MAP;
 
 pub use crate::Error;
 pub use crate::Result;
@@ -66,6 +66,11 @@ pub fn parse_solid(s: &str) -> Result<Solid> {
     }
 
     // Named colors
+    #[cfg(feature = "hash-colors")]
+    if let Some([r, g, b]) = NAMED_COLORS_MAP.get(&*s) {
+        return Ok(Solid::from_rgba8(*r, *g, *b, 255));
+    }
+
     #[cfg(feature = "named-colors")]
     if let Some([r, g, b]) = NAMED_COLORS.get(&*s) {
         return Ok(Solid::from_rgba8(*r, *g, *b, 255));
