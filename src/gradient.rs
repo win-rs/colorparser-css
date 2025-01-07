@@ -3,6 +3,7 @@ use std::f32::consts::PI;
 
 use crate::{Error, ErrorKind, Result, Solid, parser::parse_gradient};
 
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub struct Gradient {
     pub direction: GradientCoordinates,
@@ -29,7 +30,7 @@ impl fmt::Display for Gradient {
     }
 }
 
-/// Defines the coordinates for the start and end points of a gradient.
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct GradientCoordinates {
     /// The [x, y] coordinates for the start point of the gradient.
