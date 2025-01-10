@@ -5,72 +5,62 @@ use crate::Solid;
 use crate::gradient::Gradient;
 use crate::gradient::GradientCoordinates;
 use crate::gradient::is_valid_direction;
-use crate::utils::darken;
+#[cfg(feature = "theme")]
+use crate::utils::PathClean;
 use crate::utils::get_accent;
-use crate::utils::lighten;
 use crate::utils::strip_string;
 
 mod named_colors;
-use named_colors::COLOR_REGEX;
-use named_colors::DARKEN_LIGHTEN_REGEX;
+
+use named_colors::ACCENT_TRANSPARENT_PATTERN;
+use named_colors::HEX_PATTERN;
+use named_colors::NAMED_COLOR_PATTERN;
 #[cfg(feature = "named-colors")]
 pub use named_colors::NAMED_COLORS;
-#[cfg(feature = "hash-colors")]
-pub use named_colors::NAMED_COLORS_MAP;
+#[cfg(feature = "named-colors")]
+use named_colors::RGBA_PATTERN;
+use regex::Regex;
+#[cfg(any(feature = "named-colors", feature = "theme"))]
+use rustc_hash::FxHashMap;
+#[cfg(feature = "theme")]
+use serde_jsonc2::{Value, from_str};
+#[cfg(feature = "theme")]
+use std::{
+    env::current_dir,
+    fs::{metadata, read_to_string},
+    path::PathBuf,
+    sync::{LazyLock, RwLock},
+    time::SystemTime,
+};
 
 pub use crate::Error;
 pub use crate::Result;
 
-/// Parse CSS color string
-///
-/// # Examples
-///
-/// ```
-/// # use std::error::Error;
-/// # fn main() -> Result<(), Box<dyn Error>> {
-/// let c = csscolorparser::parse("#ff0")?;
-///
-/// assert_eq!(c.to_array(), [1.0, 1.0, 0.0, 1.0]);
-/// assert_eq!(c.to_rgba8(), [255, 255, 0, 255]);
-/// assert_eq!(c.to_hex_string(), "#ffff00");
-/// assert_eq!(c.to_rgb_string(), "rgb(255,255,0)");
-/// # Ok(())
-/// # }
-/// ```
-///
-/// ```
-/// # use std::error::Error;
-/// # fn main() -> Result<(), Box<dyn Error>> {
-/// let c = csscolorparser::parse("hsl(360deg,100%,50%)")?;
-///
-/// assert_eq!(c.to_array(), [1.0, 0.0, 0.0, 1.0]);
-/// assert_eq!(c.to_rgba8(), [255, 0, 0, 255]);
-/// assert_eq!(c.to_hex_string(), "#ff0000");
-/// assert_eq!(c.to_rgb_string(), "rgb(255,0,0)");
-/// # Ok(())
-/// # }
-/// ```
-pub fn parse_solid(s: &str) -> Result<Solid> {
+#[cfg(feature = "theme")]
+type ThemeCache = (String, FxHashMap<String, String>, SystemTime);
+#[cfg(feature = "theme")]
+static THEME_CACHE: LazyLock<RwLock<Option<ThemeCache>>> = LazyLock::new(|| RwLock::new(None));
+
+/// Parse CSS color string to solid (with optional theme)
+pub fn parse_solid(s: &str, file_path: Option<&str>) -> Result<Solid> {
     let s = s.trim().to_lowercase();
 
-    if s == "transparent" {
-        return Ok(Solid::new(0.0, 0.0, 0.0, 0.0));
+    match s.as_str() {
+        "transparent" => return Ok(Solid::new(0.0, 0.0, 0.0, 0.0)),
+        "accent" => return get_accent(true),
+        "accent_inactive" => return get_accent(false),
+        _ => {}
     }
 
-    if s == "accent" {
-        return get_accent(true);
-    }
-
-    if s == "accent_inactive" {
-        return get_accent(false);
+    // Custom theme
+    #[cfg(feature = "theme")]
+    if let Some(file_path) = file_path {
+        if let Some(theme_data) = parse_custom_theme(file_path)?.get(&*s) {
+            return parse_solid(theme_data, None);
+        }
     }
 
     // Named colors
-    #[cfg(feature = "hash-colors")]
-    if let Some([r, g, b]) = NAMED_COLORS_MAP.get(&*s) {
-        return Ok(Solid::from_rgba8(*r, *g, *b, 255));
-    }
-
     #[cfg(feature = "named-colors")]
     if let Some([r, g, b]) = NAMED_COLORS.get(&*s) {
         return Ok(Solid::from_rgba8(*r, *g, *b, 255));
@@ -81,71 +71,16 @@ pub fn parse_solid(s: &str) -> Result<Solid> {
         return parse_hex(s);
     }
 
-    if s.starts_with("darken(") || s.starts_with("lighten(") {
-        return parse_darken_or_lighten(&s);
-    }
+    let original_s = s.clone();
 
     if let (Some(i), Some(s)) = (s.find('('), s.strip_suffix(')')) {
         let fname = &s[..i].trim_end();
         let s = &s[i + 1..].replace([',', '/'], " ");
         let params = s.split_whitespace().collect::<Vec<&str>>();
-        let p_len = params.len();
 
         match *fname {
-            "rgb" | "rgba" => {
-                if p_len != 3 && p_len != 4 {
-                    return Err(Error::new(ErrorKind::InvalidRgb, s));
-                }
-
-                let r = parse_percent_or_255(params[0]);
-                let g = parse_percent_or_255(params[1]);
-                let b = parse_percent_or_255(params[2]);
-
-                let a = if p_len == 4 {
-                    parse_percent_or_float(params[3])
-                } else {
-                    Some((1.0, true))
-                };
-
-                if let (Some((r, r_fmt)), Some((g, g_fmt)), Some((b, b_fmt)), Some((a, _))) =
-                    (r, g, b, a)
-                {
-                    if r_fmt == g_fmt && g_fmt == b_fmt {
-                        return Ok(Solid::new(
-                            r.clamp(0.0, 1.0),
-                            g.clamp(0.0, 1.0),
-                            b.clamp(0.0, 1.0),
-                            a.clamp(0.0, 1.0),
-                        ));
-                    }
-                }
-
-                return Err(Error::new(ErrorKind::InvalidRgb, s));
-            }
-            "hsl" | "hsla" => {
-                if p_len != 3 && p_len != 4 {
-                    return Err(Error::new(ErrorKind::InvalidHsl, s));
-                }
-
-                let original_s = s;
-                let h = parse_angle(params[0]);
-                let s = parse_percent_or_float(params[1]);
-                let l = parse_percent_or_float(params[2]);
-
-                let a = if p_len == 4 {
-                    parse_percent_or_float(params[3])
-                } else {
-                    Some((1.0, true))
-                };
-
-                if let (Some(h), Some((s, s_fmt)), Some((l, l_fmt)), Some((a, _))) = (h, s, l, a) {
-                    if s_fmt == l_fmt {
-                        return Ok(Solid::from_normalized_hsla(h, s, l, a));
-                    }
-                }
-
-                return Err(Error::new(ErrorKind::InvalidHsl, original_s));
-            }
+            "rgb" | "rgba" => return parse_rgb_or_rgba(params, original_s.as_str()),
+            "hsl" | "hsla" => return parse_hsl_or_hsla(params, original_s.as_str()),
             _ => {
                 return Err(Error::new(ErrorKind::InvalidFunction, s));
             }
@@ -160,14 +95,63 @@ pub fn parse_solid(s: &str) -> Result<Solid> {
     Err(Error::new(ErrorKind::InvalidUnknown, s))
 }
 
-pub fn parse_gradient(s: &str) -> Result<Gradient> {
+pub fn parse_gradient(s: &str, file_path: Option<&str>) -> Result<Gradient> {
     if !s.starts_with("gradient(") {
         return Err(Error::new(ErrorKind::InvalidGradient, s));
     }
 
     let binding = strip_string(s.to_string(), &["gradient("], ')');
 
-    let color_matches = COLOR_REGEX
+    let base_pattern = format!(
+        r"(?i){}|{}|{}",
+        HEX_PATTERN, RGBA_PATTERN, ACCENT_TRANSPARENT_PATTERN
+    );
+
+    let mut color_regex: Regex = Regex::new(base_pattern.as_str()).unwrap();
+
+    #[cfg(feature = "theme")]
+    {
+        if let Some(file_path) = file_path {
+            if let Ok(theme_data) = parse_custom_theme(file_path) {
+                // Get the keys from the theme_data (assuming it's a map-like structure)
+                let theme_keys: Vec<_> = theme_data.keys().cloned().collect();
+
+                // Join the keys into a single pattern string separated by "|"
+                let theme_pattern_base = theme_keys.join("|");
+                let theme_pattern = format!(r"\b(?:{})\b", theme_pattern_base);
+
+                // If `named-colors` is also enabled, include NAMED_COLOR_PATTERN as well
+                #[cfg(feature = "named-colors")]
+                {
+                    color_regex = Regex::new(
+                        format!(
+                            r"(?i){}|{}|{}",
+                            base_pattern, theme_pattern, NAMED_COLOR_PATTERN
+                        )
+                        .as_str(),
+                    )
+                    .unwrap();
+                }
+
+                // If only `theme` is enabled (no `named-colors`), use just `theme_pattern`
+                #[cfg(not(feature = "named-colors"))]
+                {
+                    color_regex =
+                        Regex::new(format!(r"(?i){}|{}", base_pattern, theme_pattern).as_str())
+                            .unwrap();
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "named-colors")]
+    #[cfg(not(feature = "theme"))]
+    {
+        color_regex =
+            Regex::new(format!(r"(?i){}|{}", base_pattern, NAMED_COLOR_PATTERN).as_str()).unwrap();
+    }
+
+    let color_matches = color_regex
         .captures_iter(&binding)
         .filter_map(|cap| cap.get(0).map(|m| m.as_str()))
         .collect::<Vec<&str>>();
@@ -192,7 +176,7 @@ pub fn parse_gradient(s: &str) -> Result<Gradient> {
 
     let colors = color_matches
         .iter()
-        .filter_map(|&color| parse_solid(color).ok()) // Only keep Ok values
+        .filter_map(|&color| parse_solid(color, file_path).ok()) // Only keep Ok values
         .collect::<Vec<Solid>>();
 
     let direction = GradientCoordinates::try_from(direction.as_str())?;
@@ -200,41 +184,11 @@ pub fn parse_gradient(s: &str) -> Result<Gradient> {
     Ok(Gradient { direction, colors })
 }
 
-pub fn parse(s: &str) -> Result<Color> {
+pub fn parse(s: &str, file_path: Option<&str>) -> Result<Color> {
     if s.starts_with("gradient(") {
-        parse_gradient(s).map(|res| Color(ColorValue::Gradient(res)))
+        parse_gradient(s, file_path).map(|res| Color(ColorValue::Gradient(res)))
     } else {
-        parse_solid(s).map(|res| Color(ColorValue::Solid(res)))
-    }
-}
-
-fn parse_darken_or_lighten(s: &str) -> Result<Solid> {
-    let is_darken = s.starts_with("darken(");
-    if let Some(caps) = DARKEN_LIGHTEN_REGEX.captures(s) {
-        if caps.len() != 4 {
-            return match is_darken {
-                true => Err(Error::new(ErrorKind::InvalidDarken, s)),
-                false => Err(Error::new(ErrorKind::InvalidLighten, s)),
-            };
-        }
-        let dark_or_lighten = &caps[1];
-        let color_str = &caps[2];
-        let percentage = &caps[3].parse::<f32>().unwrap_or(10.0);
-
-        let color = parse_solid(color_str)?;
-
-        let color_res = match dark_or_lighten {
-            "darken" => darken(color.to_hsla(), *percentage),
-            "lighten" => lighten(color.to_hsla(), *percentage),
-            _ => color,
-        };
-
-        return Ok(color_res);
-    }
-
-    match is_darken {
-        true => Err(Error::new(ErrorKind::InvalidDarken, s)),
-        false => Err(Error::new(ErrorKind::InvalidLighten, s)),
+        parse_solid(s, file_path).map(|res| Color(ColorValue::Solid(res)))
     }
 }
 
@@ -272,6 +226,57 @@ fn parse_hex(s: &str) -> Result<Solid> {
     }
 }
 
+fn parse_rgb_or_rgba(params: Vec<&str>, original_s: &str) -> Result<Solid> {
+    if params.len() != 3 && params.len() != 4 {
+        return Err(Error::new(ErrorKind::InvalidRgb, original_s));
+    }
+
+    let r = parse_percent_or_255(params[0]);
+    let g = parse_percent_or_255(params[1]);
+    let b = parse_percent_or_255(params[2]);
+    let a = if params.len() == 4 {
+        parse_percent_or_float(params[3])
+    } else {
+        Some((1.0, true))
+    };
+
+    if let (Some((r, r_fmt)), Some((g, g_fmt)), Some((b, b_fmt)), Some((a, _))) = (r, g, b, a) {
+        if r_fmt == g_fmt && g_fmt == b_fmt {
+            return Ok(Solid::new(
+                r.clamp(0.0, 1.0),
+                g.clamp(0.0, 1.0),
+                b.clamp(0.0, 1.0),
+                a.clamp(0.0, 1.0),
+            ));
+        }
+    }
+
+    Err(Error::new(ErrorKind::InvalidRgb, original_s))
+}
+
+fn parse_hsl_or_hsla(params: Vec<&str>, original_s: &str) -> Result<Solid> {
+    if params.len() != 3 && params.len() != 4 {
+        return Err(Error::new(ErrorKind::InvalidHsl, original_s));
+    }
+
+    let h = parse_angle(params[0]);
+    let s = parse_percent_or_float(params[1]);
+    let l = parse_percent_or_float(params[2]);
+    let a = if params.len() == 4 {
+        parse_percent_or_float(params[3])
+    } else {
+        Some((1.0, true))
+    };
+
+    if let (Some(h), Some((s, s_fmt)), Some((l, l_fmt)), Some((a, _))) = (h, s, l, a) {
+        if s_fmt == l_fmt {
+            return Ok(Solid::from_normalized_hsla(h, s, l, a));
+        }
+    }
+
+    Err(Error::new(ErrorKind::InvalidHsl, original_s))
+}
+
 fn parse_percent_or_float(s: &str) -> Option<(f32, bool)> {
     s.strip_suffix('%')
         .and_then(|s| s.parse().ok().map(|t: f32| (t / 100.0, true)))
@@ -303,4 +308,67 @@ fn parse_angle(s: &str) -> Option<f32> {
                 .map(|t: f32| t * 360.0)
         })
         .or_else(|| s.parse().ok())
+}
+
+#[cfg(feature = "theme")]
+fn parse_custom_theme(file_path: &str) -> Result<FxHashMap<String, String>> {
+    let mut full_path = PathBuf::from(file_path).clean();
+
+    // If the path is relative, join it with the current working directory
+    if full_path.is_relative() {
+        let cwd =
+            current_dir().map_err(|e| Error::new(ErrorKind::InvalidUnknown, format!("{:?}", e)))?;
+        full_path = cwd.join(full_path).clean(); // Fix here: Update full_path
+    }
+
+    let current_metadata = metadata(&full_path)
+        .map_err(|e| Error::new(ErrorKind::InvalidUnknown, format!("{:?}", e)))?;
+    let current_modified = current_metadata
+        .modified()
+        .map_err(|e| Error::new(ErrorKind::InvalidUnknown, format!("{:?}", e)))?;
+
+    // If the cache exists and the path has not changed, check the modification timestamp.
+    if let Some((cached_path, theme_data, cached_time)) = THEME_CACHE.read().unwrap().as_ref() {
+        if cached_path == &full_path.to_string_lossy().into_owned()
+            && current_modified != *cached_time
+        {
+            // If path matches and the file has been modified, reload and update the cache.
+            return Ok(theme_data.clone());
+        }
+    }
+
+    // If no cache or path changed, reload the theme.
+    reload_and_cache_theme(full_path)
+}
+
+#[cfg(feature = "theme")]
+fn reload_and_cache_theme(file_path: PathBuf) -> Result<FxHashMap<String, String>> {
+    let path = file_path.as_path();
+    let contents = read_to_string(path)
+        .map_err(|e| Error::new(ErrorKind::InvalidUnknown, format!("{:?}", e)))?;
+
+    // Parse the theme file contents into a map
+    let theme_map = from_str::<FxHashMap<String, Value>>(&contents)
+        .map_err(|e| {
+            Error::new(
+                ErrorKind::InvalidUnknown,
+                format!("JSON parse error: {:?}", e),
+            )
+        })?
+        .into_iter()
+        .filter_map(|(key, value)| value.as_str().map(|v| (key, v.to_string())))
+        .collect::<FxHashMap<String, String>>();
+
+    let current_metadata = std::fs::metadata(path)
+        .map_err(|e| Error::new(ErrorKind::InvalidUnknown, format!("{:?}", e)))?;
+    let current_modified = current_metadata
+        .modified()
+        .map_err(|e| Error::new(ErrorKind::InvalidUnknown, format!("{:?}", e)))?;
+
+    // Cache the theme with the path, theme content, and last modified timestamp
+    let mut cache = THEME_CACHE.write().unwrap();
+    let path_string = path.to_string_lossy().into_owned();
+    *cache = Some((path_string, theme_map.clone(), current_modified));
+
+    Ok(theme_map)
 }

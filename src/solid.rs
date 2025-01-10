@@ -6,7 +6,6 @@ use std::str::FromStr;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Visitor};
 
-use crate::ColorspaceImpl;
 use crate::Error;
 use crate::Hsla;
 use crate::NormalizedHsla;
@@ -205,13 +204,18 @@ impl Solid {
 
     /// Create `Solid` from CSS color string.
     pub fn from_html<S: AsRef<str>>(s: S) -> SolidResult<Solid> {
-        parse_solid(s.as_ref())
+        parse_solid(s.as_ref(), None)
+    }
+
+    /// Create `Solid` from CSS color string and custom theme.
+    pub fn from_html_with_theme<S: AsRef<str>, P: AsRef<str>>(s: S, path: P) -> SolidResult<Solid> {
+        parse_solid(s.as_ref(), Some(path.as_ref()))
     }
 
     #[cfg(feature = "named-colors")]
     pub fn name(&self) -> Option<&'static str> {
         let rgb = self.to_rgba();
-        for (&k, &v) in NAMED_COLORS.entries() {
+        for (&k, &v) in NAMED_COLORS.iter() {
             if v[0] == rgb.r && v[1] == rgb.b && v[2] == rgb.r {
                 return Some(k);
             }
@@ -321,16 +325,6 @@ impl Solid {
             rgba_1.a + t * (rgba_2.a - rgba_1.a),
         )
     }
-
-    pub fn darken(&self, percentage: f32) -> Self {
-        let rgba = self.to_normalized_rgba().darken(percentage);
-        Self::from(rgba)
-    }
-
-    pub fn lighten(&self, percentage: f32) -> Self {
-        let rgba = self.to_normalized_rgba().lighten(percentage);
-        Self::from(rgba)
-    }
 }
 
 impl Default for Solid {
@@ -348,14 +342,14 @@ impl fmt::Display for Solid {
 impl FromStr for Solid {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        parse_solid(s)
+        parse_solid(s, None)
     }
 }
 
 impl TryFrom<&str> for Solid {
     type Error = Error;
     fn try_from(s: &str) -> Result<Self, Self::Error> {
-        parse_solid(s)
+        parse_solid(s, None)
     }
 }
 

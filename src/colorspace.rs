@@ -1,7 +1,7 @@
 use core::fmt;
 use std::ops::Mul;
 
-use crate::utils::{darken, hsl_to_rgb, lighten, normalize_angle, rgb_to_hsl};
+use crate::utils::{hsl_to_rgb, normalize_angle, rgb_to_hsl};
 
 pub trait ColorspaceImpl {
     fn to_rgba(&self) -> Rgba;
@@ -9,8 +9,6 @@ pub trait ColorspaceImpl {
     fn to_normalized_rgba(&self) -> NormalizedRgba;
     fn to_hsla(&self) -> Hsla;
     fn to_normalized_hsla(&self) -> NormalizedHsla;
-    fn darken(&self, percentage: f32) -> Self;
-    fn lighten(&self, percentage: f32) -> Self;
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Copy)]
@@ -65,14 +63,6 @@ impl ColorspaceImpl for Rgba {
             l: l.mul(100.0),
             a: self.a,
         }
-    }
-
-    fn darken(&self, percentage: f32) -> Self {
-        darken(self.to_hsla(), percentage).to_rgba()
-    }
-
-    fn lighten(&self, percentage: f32) -> Self {
-        lighten(self.to_hsla(), percentage).to_rgba()
     }
 }
 
@@ -129,14 +119,6 @@ impl ColorspaceImpl for Rgba16 {
             a: self.a,
         }
     }
-
-    fn darken(&self, percentage: f32) -> Self {
-        darken(self.to_hsla(), percentage).to_rgba16()
-    }
-
-    fn lighten(&self, percentage: f32) -> Self {
-        lighten(self.to_hsla(), percentage).to_rgba16()
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Copy)]
@@ -183,14 +165,6 @@ impl ColorspaceImpl for NormalizedRgba {
             l: l.mul(100.0),
             a: self.a,
         }
-    }
-
-    fn darken(&self, percentage: f32) -> Self {
-        darken(self.to_hsla(), percentage).to_normalized_rgba()
-    }
-
-    fn lighten(&self, percentage: f32) -> Self {
-        lighten(self.to_hsla(), percentage).to_normalized_rgba()
     }
 }
 
@@ -240,14 +214,6 @@ impl ColorspaceImpl for Hsla {
     fn to_hsla(&self) -> Self {
         *self
     }
-
-    fn darken(&self, percentage: f32) -> Self {
-        darken(self.to_hsla(), percentage).to_hsla()
-    }
-
-    fn lighten(&self, percentage: f32) -> Self {
-        lighten(self.to_hsla(), percentage).to_hsla()
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Copy)]
@@ -295,14 +261,6 @@ impl ColorspaceImpl for NormalizedHsla {
             l: self.l * 100.0,
             a: self.a,
         }
-    }
-
-    fn darken(&self, percentage: f32) -> Self {
-        darken(self.to_hsla(), percentage).to_normalized_hsla()
-    }
-
-    fn lighten(&self, percentage: f32) -> Self {
-        lighten(self.to_hsla(), percentage).to_normalized_hsla()
     }
 }
 

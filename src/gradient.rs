@@ -244,6 +244,6 @@ impl TryFrom<&str> for Gradient {
     /// # Returns
     /// A `Result` that is `Ok(GradientCoordinates)` on success or `Err(WinSolidError)` on failure.
     fn try_from(color: &str) -> Result<Self> {
-        parse_gradient(color)
+        parse_gradient(color, None)
     }
 }

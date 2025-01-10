@@ -17,6 +17,12 @@ impl Color {
         Self::try_from(s.as_ref())
     }
 
+    /// Create color from CSS color string.
+    #[cfg(feature = "theme")]
+    pub fn from_html_with_theme<S: AsRef<str>, P: AsRef<str>>(s: S, path: P) -> ColorResult<Self> {
+        Self::try_from_theme(s.as_ref(), path.as_ref())
+    }
+
     /// Convert a `Color` to a `Gradient`.
     pub fn to_gradient(&self) -> ColorResult<Gradient> {
         match self.0.clone() {
@@ -31,6 +37,11 @@ impl Color {
             ColorValue::Solid(solid) => Ok(solid),
             _ => Err(Error::new(ErrorKind::InvalidFunction, self.to_string())),
         }
+    }
+
+    #[cfg(feature = "theme")]
+    fn try_from_theme(s: &str, path: &str) -> ColorResult<Self> {
+        parse(s, Some(path))
     }
 }
 
@@ -54,7 +65,7 @@ impl TryFrom<&str> for Color {
     type Error = Error;
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
-        parse(s)
+        parse(s, None)
     }
 }
 

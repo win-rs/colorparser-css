@@ -17,6 +17,12 @@ pub enum ErrorKind {
     InvalidDarken,
     /// Error when the provided lighten format is invalid.
     InvalidLighten,
+    #[cfg(feature = "theme")]
+    /// Error when the provided theme color is invalid.
+    InvalidThemeColor,
+    #[cfg(feature = "theme")]
+    /// Error when the provided theme path is invalid.
+    InvalidThemePath,
     // Error when unknown.
     InvalidUnknown,
 }
@@ -36,6 +42,10 @@ impl core::fmt::Display for ErrorKind {
             Self::InvalidLighten => write!(f, "invalid lighten format"),
             Self::InvalidFunction => write!(f, "invalid color function"),
             Self::InvalidUnknown => write!(f, "invalid unknown format"),
+            #[cfg(feature = "theme")]
+            Self::InvalidThemeColor => write!(f, "invalid theme color"),
+            #[cfg(feature = "theme")]
+            Self::InvalidThemePath => write!(f, "invalid theme path"),
         }
     }
 }
