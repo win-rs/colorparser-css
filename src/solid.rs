@@ -18,6 +18,7 @@ use crate::parser::NAMED_COLORS;
 use crate::parser::parse_solid;
 use crate::utils::{clamp0_1, hsl_to_rgb, normalize_angle, rgb_to_hsl};
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Solid(f32, f32, f32, f32);
 

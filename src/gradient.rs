@@ -4,6 +4,7 @@ use std::f32::consts::PI;
 use crate::{Error, ErrorKind, Result, Solid, parser::parse_gradient};
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub struct Gradient {
     pub direction: GradientCoordinates,
@@ -31,6 +32,7 @@ impl fmt::Display for Gradient {
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schema_jsonrs::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct GradientCoordinates {
     /// The [x, y] coordinates for the start point of the gradient.

@@ -2,12 +2,14 @@ use std::fmt;
 
 use crate::{Error, ErrorKind, Result as ColorResult, Solid, gradient::Gradient, parse};
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum ColorValue {
     Solid(Solid),
     Gradient(Gradient),
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Color(pub ColorValue);
 
