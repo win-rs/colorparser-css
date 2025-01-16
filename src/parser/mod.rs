@@ -301,7 +301,7 @@ fn parse_angle(s: &str) -> Option<f32> {
     if let Some(s) = s.strip_suffix("turn") {
         return s.parse::<f32>().ok().map(|t| t * 360.0);
     }
-    
+
     s.parse().ok()
 }
 

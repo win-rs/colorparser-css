@@ -69,9 +69,9 @@ mod error;
 mod gradient;
 mod parser;
 mod solid;
-mod utils;
 #[cfg(feature = "theme")]
 mod theme;
+mod utils;
 
 pub use color::Color;
 pub use color::ColorValue;
