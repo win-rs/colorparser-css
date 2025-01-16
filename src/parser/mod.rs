@@ -5,23 +5,17 @@ use crate::Solid;
 use crate::gradient::Gradient;
 use crate::gradient::GradientCoordinates;
 use crate::gradient::is_valid_direction;
-#[cfg(feature = "theme")]
-use crate::utils::PathClean;
 use crate::utils::get_accent;
 use crate::utils::strip_string;
-
-mod named_colors;
 #[cfg(feature = "theme")]
-pub mod theme;
+use crate::{Theme, utils::PathClean};
 
 use named_colors::ACCENT_TRANSPARENT_PATTERN;
 use named_colors::HEX_PATTERN;
 use named_colors::HSLA_PATTERN;
-use named_colors::NAMED_COLOR_PATTERN;
-#[cfg(feature = "named-colors")]
-pub use named_colors::NAMED_COLORS;
-#[cfg(feature = "named-colors")]
 use named_colors::RGBA_PATTERN;
+#[cfg(feature = "named-colors")]
+pub use named_colors::{NAMED_COLOR_PATTERN, NAMED_COLORS};
 use regex::Regex;
 #[cfg(feature = "theme")]
 use std::{
@@ -31,11 +25,11 @@ use std::{
     sync::{LazyLock, RwLock},
     time::SystemTime,
 };
-#[cfg(feature = "theme")]
-use theme::Theme;
 
 pub use crate::Error;
 pub use crate::Result;
+
+mod named_colors;
 
 #[cfg(feature = "theme")]
 type ThemeCache = (String, Theme, SystemTime);
@@ -44,7 +38,7 @@ static THEME_CACHE: LazyLock<RwLock<Option<ThemeCache>>> = LazyLock::new(|| RwLo
 
 /// Parse CSS color string to solid (with optional theme)
 pub fn parse_solid(s: &str, file_path: Option<&str>) -> Result<Solid> {
-    let s = s.trim().to_lowercase();
+    let s = s.trim().to_ascii_lowercase();
 
     match s.as_str() {
         "transparent" => return Ok(Solid::new(0.0, 0.0, 0.0, 0.0)),
@@ -79,13 +73,11 @@ pub fn parse_solid(s: &str, file_path: Option<&str>) -> Result<Solid> {
         let s = &s[i + 1..].replace([',', '/'], " ");
         let params = s.split_whitespace().collect::<Vec<&str>>();
 
-        match *fname {
-            "rgb" | "rgba" => return parse_rgb_or_rgba(params, original_s.as_str()),
-            "hsl" | "hsla" => return parse_hsl_or_hsla(params, original_s.as_str()),
-            _ => {
-                return Err(Error::new(ErrorKind::InvalidFunction, s));
-            }
-        }
+        return match *fname {
+            "rgb" | "rgba" => parse_rgb_or_rgba(params, original_s.as_str()),
+            "hsl" | "hsla" => parse_hsl_or_hsla(params, original_s.as_str()),
+            _ => Err(Error::new(ErrorKind::InvalidFunction, s)),
+        };
     }
 
     // Hex format without prefix '#'
@@ -283,36 +275,34 @@ fn parse_hsl_or_hsla(params: Vec<&str>, original_s: &str) -> Result<Solid> {
 }
 
 fn parse_percent_or_float(s: &str) -> Option<(f32, bool)> {
-    s.strip_suffix('%')
-        .and_then(|s| s.parse().ok().map(|t: f32| (t / 100.0, true)))
-        .or_else(|| s.parse().ok().map(|t| (t, false)))
+    match s.strip_suffix('%') {
+        Some(num) => num.parse().ok().map(|t: f32| (t / 100.0, true)),
+        None => s.parse().ok().map(|t| (t, false)),
+    }
 }
 
 fn parse_percent_or_255(s: &str) -> Option<(f32, bool)> {
-    s.strip_suffix('%')
-        .and_then(|s| s.parse().ok().map(|t: f32| (t / 100.0, true)))
-        .or_else(|| s.parse().ok().map(|t: f32| (t / 255.0, false)))
+    match s.strip_suffix('%') {
+        Some(num) => num.parse().ok().map(|t: f32| (t / 100.0, true)),
+        None => s.parse().ok().map(|t: f32| (t / 255.0, false)),
+    }
 }
 
 fn parse_angle(s: &str) -> Option<f32> {
-    s.strip_suffix("deg")
-        .and_then(|s| s.parse().ok())
-        .or_else(|| {
-            s.strip_suffix("grad")
-                .and_then(|s| s.parse().ok())
-                .map(|t: f32| t * 360.0 / 400.0)
-        })
-        .or_else(|| {
-            s.strip_suffix("rad")
-                .and_then(|s| s.parse().ok())
-                .map(|t: f32| t.to_degrees())
-        })
-        .or_else(|| {
-            s.strip_suffix("turn")
-                .and_then(|s| s.parse().ok())
-                .map(|t: f32| t * 360.0)
-        })
-        .or_else(|| s.parse().ok())
+    if let Some(s) = s.strip_suffix("deg") {
+        return s.parse().ok();
+    }
+    if let Some(s) = s.strip_suffix("grad") {
+        return s.parse::<f32>().ok().map(|t| t * 360.0 / 400.0);
+    }
+    if let Some(s) = s.strip_suffix("rad") {
+        return s.parse::<f32>().ok().map(|t| t.to_degrees());
+    }
+    if let Some(s) = s.strip_suffix("turn") {
+        return s.parse::<f32>().ok().map(|t| t * 360.0);
+    }
+    
+    s.parse().ok()
 }
 
 #[cfg(feature = "theme")]

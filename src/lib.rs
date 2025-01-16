@@ -70,6 +70,8 @@ mod gradient;
 mod parser;
 mod solid;
 mod utils;
+#[cfg(feature = "theme")]
+mod theme;
 
 pub use color::Color;
 pub use color::ColorValue;
@@ -91,4 +93,4 @@ pub use solid::Solid;
 pub use parser::NAMED_COLORS;
 
 #[cfg(feature = "theme")]
-pub use parser::theme::{Theme, ThemeValue};
+pub use theme::{Theme, ThemeValue};

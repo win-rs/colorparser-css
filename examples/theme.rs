@@ -15,8 +15,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     "###;
 
     let theme = Theme::parse_theme(json_data)?;
-
-    // Test cases
     if let Some(value) = theme.get_color("blue") {
         println!("blue = {}", value);
     } else {
