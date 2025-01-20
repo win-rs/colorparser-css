@@ -7,7 +7,7 @@ use crate::gradient::GradientCoordinates;
 use crate::gradient::is_valid_direction;
 use crate::utils::get_accent;
 use crate::utils::strip_string;
-#[cfg(feature = "theme")]
+#[cfg(any(feature = "theme", feature = "theme_yml"))]
 use crate::{Theme, utils::PathClean};
 
 use named_colors::ACCENT_TRANSPARENT_PATTERN;
@@ -17,7 +17,7 @@ use named_colors::RGBA_PATTERN;
 #[cfg(feature = "named-colors")]
 pub use named_colors::{NAMED_COLOR_PATTERN, NAMED_COLORS};
 use regex::Regex;
-#[cfg(feature = "theme")]
+#[cfg(any(feature = "theme", feature = "theme_yml"))]
 use std::{
     env::current_dir,
     fs::{metadata, read_to_string},
@@ -31,9 +31,9 @@ pub use crate::Result;
 
 mod named_colors;
 
-#[cfg(feature = "theme")]
+#[cfg(any(feature = "theme", feature = "theme_yml"))]
 type ThemeCache = (String, Theme, SystemTime);
-#[cfg(feature = "theme")]
+#[cfg(any(feature = "theme", feature = "theme_yml"))]
 static THEME_CACHE: LazyLock<RwLock<Option<ThemeCache>>> = LazyLock::new(|| RwLock::new(None));
 
 /// Parse CSS color string to solid (with optional theme)
@@ -48,7 +48,7 @@ pub fn parse_solid(s: &str, file_path: Option<&str>) -> Result<Solid> {
     }
 
     // Custom theme
-    #[cfg(feature = "theme")]
+    #[cfg(any(feature = "theme", feature = "theme_yml"))]
     if let Some(file_path) = file_path {
         if let Some(color) = parse_custom_theme(file_path)?.get_color(&s) {
             return parse_solid(color.as_str(), None);
@@ -102,7 +102,7 @@ pub fn parse_gradient(s: &str, file_path: Option<&str>) -> Result<Gradient> {
 
     let mut color_regex: Regex = Regex::new(base_pattern.as_str()).unwrap();
 
-    #[cfg(feature = "theme")]
+    #[cfg(any(feature = "theme", feature = "theme_yml"))]
     {
         if let Some(file_path) = file_path {
             if let Ok(theme_data) = parse_custom_theme(file_path) {
@@ -142,7 +142,7 @@ pub fn parse_gradient(s: &str, file_path: Option<&str>) -> Result<Gradient> {
     }
 
     #[cfg(feature = "named-colors")]
-    #[cfg(not(feature = "theme"))]
+    #[cfg(not(any(feature = "theme", feature = "theme_yml")))]
     {
         color_regex =
             Regex::new(format!(r"(?i){}|{}", base_pattern, NAMED_COLOR_PATTERN).as_str()).unwrap();
@@ -305,7 +305,7 @@ fn parse_angle(s: &str) -> Option<f32> {
     s.parse().ok()
 }
 
-#[cfg(feature = "theme")]
+#[cfg(any(feature = "theme", feature = "theme_yml"))]
 fn parse_custom_theme(file_path: &str) -> Result<Theme> {
     let mut full_path = PathBuf::from(file_path).clean();
 
@@ -336,7 +336,7 @@ fn parse_custom_theme(file_path: &str) -> Result<Theme> {
     reload_and_cache_theme(full_path)
 }
 
-#[cfg(feature = "theme")]
+#[cfg(any(feature = "theme", feature = "theme_yml"))]
 fn reload_and_cache_theme(file_path: PathBuf) -> Result<Theme> {
     let path = file_path.as_path();
     let contents = read_to_string(path)

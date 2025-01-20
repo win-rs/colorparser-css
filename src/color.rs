@@ -20,7 +20,7 @@ impl Color {
     }
 
     /// Create color from CSS color string.
-    #[cfg(feature = "theme")]
+    #[cfg(any(feature = "theme", feature = "theme_yml"))]
     pub fn from_html_with_theme<S: AsRef<str>, P: AsRef<str>>(s: S, path: P) -> ColorResult<Self> {
         Self::try_from_theme(s.as_ref(), path.as_ref())
     }
@@ -41,7 +41,7 @@ impl Color {
         }
     }
 
-    #[cfg(feature = "theme")]
+    #[cfg(any(feature = "theme", feature = "theme_yml"))]
     fn try_from_theme(s: &str, path: &str) -> ColorResult<Self> {
         parse(s, Some(path))
     }

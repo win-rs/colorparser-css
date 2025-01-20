@@ -69,7 +69,7 @@ mod error;
 mod gradient;
 mod parser;
 mod solid;
-#[cfg(feature = "theme")]
+#[cfg(any(feature = "theme", feature = "theme_yml"))]
 mod theme;
 mod utils;
 
@@ -92,5 +92,5 @@ pub use solid::Solid;
 #[cfg(feature = "named-colors")]
 pub use parser::NAMED_COLORS;
 
-#[cfg(feature = "theme")]
+#[cfg(any(feature = "theme", feature = "theme_yml"))]
 pub use theme::{Theme, ThemeValue};

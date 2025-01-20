@@ -17,10 +17,10 @@ pub enum ErrorKind {
     InvalidDarken,
     /// Error when the provided lighten format is invalid.
     InvalidLighten,
-    #[cfg(feature = "theme")]
+    #[cfg(any(feature = "theme", feature = "theme_yml"))]
     /// Error when the provided theme color is invalid.
     InvalidThemeColor,
-    #[cfg(feature = "theme")]
+    #[cfg(any(feature = "theme", feature = "theme_yml"))]
     /// Error when the provided theme path is invalid.
     InvalidThemePath,
     // Error when unknown.

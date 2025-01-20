@@ -4,6 +4,8 @@ use core::fmt;
 use fx_hash::FxHashMap as HashMap;
 use serde_jsonc2::Value;
 use serde_jsonc2::from_str;
+#[cfg(feature = "theme_yml")]
+use serde_yml::{Value as YamlValue, from_str as from_yml_str, to_string as yml_to_string};
 #[cfg(not(feature = "fast-hash"))]
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -109,6 +111,35 @@ impl ThemeValue {
             _ => ThemeValue::Color(Color::new(value.to_string())),
         }
     }
+
+    /// Converts a `serde_yml::Value` into a `ThemeValue`.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - A `serde_yml::Value` to convert.
+    ///
+    /// # Returns
+    ///
+    /// A `ThemeValue` representing the input value.
+    #[cfg(feature = "theme_yml")]
+    pub fn from_yaml(value: YamlValue) -> Self {
+        match value {
+            YamlValue::Mapping(map) => {
+                let nested = map
+                    .into_iter()
+                    .map(|(key, value): (YamlValue, YamlValue)| {
+                        // Convert YamlValue::String into a regular string and handle nested values
+                        let key = key.as_str().unwrap_or_default().to_string();
+                        (key, ThemeValue::from_yaml(value))
+                    })
+                    .collect::<HashMap<String, ThemeValue>>();
+                ThemeValue::Subtheme(Theme(nested))
+            }
+            YamlValue::String(s) => ThemeValue::Color(Color::new(s)),
+            // Handle other types (like booleans, integers, etc.)
+            _ => ThemeValue::Color(Color::new(yml_to_string(&value).unwrap_or_default())),
+        }
+    }
 }
 
 /// Represents a theme, which is a collection of key-value pairs.
@@ -187,16 +218,32 @@ impl Theme {
         })
     }
 
-    /// Parses a JSON string into a `Theme`.
+    /// Parses a theme configuration from a string.
     ///
     /// # Arguments
     ///
-    /// * `contents` - A string slice containing the JSON data.
+    /// * `contents` - A string slice containing the theme data in either YAML or JSON format.
     ///
     /// # Returns
     ///
-    /// A `Result` containing the parsed `Theme` or an error.
+    /// A `Result` containing the parsed `Theme` or an error. The function will first attempt to parse the contents as YAML (if the `theme_yml` feature is enabled),
+    /// and fallback to JSON parsing if YAML parsing fails or is not supported.
     pub fn parse_theme(contents: &str) -> Result<Theme, Box<dyn std::error::Error>> {
+        // Try to parse as YAML if the `theme_yml` feature is enabled
+        #[cfg(feature = "theme_yml")]
+        if let Ok(yaml_value) = from_yml_str(contents) {
+            if let YamlValue::Mapping(_) = &yaml_value {
+                let theme = ThemeValue::from_yaml(yaml_value);
+                if let ThemeValue::Subtheme(theme_map) = theme {
+                    return Ok(theme_map);
+                } else {
+                    return Err("invalid root type: expected a mapping.".into());
+                }
+            } else {
+                return Err("invalid root type: expected a mapping.".into());
+            }
+        }
+
         let value: Value = from_str(contents)?;
 
         if let Value::Object(_) = &value {
@@ -289,9 +336,44 @@ mod tests {
     }
     "###;
 
+    #[cfg(feature = "theme_yml")]
+    const YAML_DATA: &str = r###"
+    blue: "#89b4fa"
+    text:
+        white: "#cdd6f4"
+        dark:
+            grey: "#313244"
+    red: "#f38ba8"
+    "###;
+
     #[test]
     fn test_get_color() {
         let theme = Theme::parse_theme(JSON_DATA).unwrap();
+
+        // Test getting the "blue" color
+        if let Some(ThemeValue::Color(color)) = theme.get("blue") {
+            assert_eq!(color.as_str(), "#89b4fa");
+        } else {
+            panic!("Failed to get the blue color");
+        }
+
+        // Test getting the "red" color
+        if let Some(ThemeValue::Color(color)) = theme.get("red") {
+            assert_eq!(color.as_str(), "#f38ba8");
+        } else {
+            panic!("Failed to get the red color");
+        }
+
+        // Test for non-existent key
+        assert!(theme.get("yellow").is_none());
+    }
+
+    #[test]
+    #[cfg(feature = "theme_yml")]
+    fn test_get_color_yml() {
+        let theme = Theme::parse_theme(YAML_DATA).unwrap();
+
+        println!("{:?}", theme);
 
         // Test getting the "blue" color
         if let Some(ThemeValue::Color(color)) = theme.get("blue") {

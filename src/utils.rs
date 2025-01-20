@@ -190,13 +190,13 @@ pub fn get_accent(active: bool) -> Result<Solid> {
     }
 }
 
-#[cfg(feature = "theme")]
+#[cfg(any(feature = "theme", feature = "theme_yml"))]
 /// The Clean trait implements a `clean` method.
 pub trait PathClean {
     fn clean(&self) -> PathBuf;
 }
 
-#[cfg(feature = "theme")]
+#[cfg(any(feature = "theme", feature = "theme_yml"))]
 /// PathClean implemented for `Path`
 impl PathClean for Path {
     fn clean(&self) -> PathBuf {
@@ -204,7 +204,7 @@ impl PathClean for Path {
     }
 }
 
-#[cfg(feature = "theme")]
+#[cfg(any(feature = "theme", feature = "theme_yml"))]
 /// PathClean implemented for `PathBuf`
 impl PathClean for PathBuf {
     fn clean(&self) -> PathBuf {
@@ -212,7 +212,7 @@ impl PathClean for PathBuf {
     }
 }
 
-#[cfg(feature = "theme")]
+#[cfg(any(feature = "theme", feature = "theme_yml"))]
 /// The core implementation. It performs the following, lexically:
 /// 1. Reduce multiple slashes to a single slash.
 /// 2. Eliminate `.` path name elements (the current directory).
